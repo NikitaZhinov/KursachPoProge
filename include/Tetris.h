@@ -3,7 +3,6 @@
 #include <SFML/Graphics.hpp>
 #include <cmath>
 #include <random>
-#include <ctime>
 
 class Tetris {
 private:
@@ -43,6 +42,14 @@ private:
         Brick_n number;
     };
 
+    enum Scene {
+        Overlay,
+        Run,
+        Lose,
+        Pause
+    };
+
+    Scene scene = Overlay;
     const Size_t screen_size = { 400, 600 };
     Brick_t current_brick;
     Brick_t next_brick;
@@ -50,7 +57,9 @@ private:
     int level = 1;
     sf::Clock timer;
     sf::Clock timer_move;
-    int game_time = 0;
+    sf::Clock game_time;
+    bool get_last_time = true;
+    int last_time = 0;
     int score = 0;
     int record = 0;
     const Size_t size_field = { 10, 20 };
@@ -76,13 +85,26 @@ private:
     Size_t brickgame_screen_size = { 260, 260 };
     Point_t brickgame_screen_pos = { 70, 50 };
 
+    sf::Font font;
+    sf::Text next_text;
+    sf::Text score_text;
+    sf::Text level_text;
+    sf::Text record_text;
+    sf::Text time_text;
+    sf::Text start_text;
+    sf::Text lose_text;
+    Point_t text_pos = { brickgame_screen_pos.x + brickgame_screen_size.width / 2, brickgame_screen_pos.y };
+
+    sf::RectangleShape line;
+
     void initGame();
     void draw(sf::RenderWindow &window);
     void logic();
     void getAction();
+    void viewStates(sf::RenderWindow &window);
 
     void drawField(sf::RenderWindow &window);
-    void drawBrick(sf::RenderWindow &window);
+    void drawBrick(sf::RenderWindow &window, const Brick_t &brick);
     void initBrickGame();
     void initBrickGameBackground();
     void initBrickGameButtons();
@@ -106,7 +128,8 @@ private:
     void moveLeftBrick();
     void moveRightBrick();
     void toDownBrick();
-    void updatePixelBrick();
+    void updatePixelBrick(Brick_t &brick);
+    void initText();
 
 public:
     Tetris();

@@ -25,9 +25,21 @@ void Tetris::run() {
 
         window.clear();
 
-        draw(window);
-        logic();
+        window.draw(brickgame_background);
+        for (int i = 0; i < brickgame_buttons_count + 1; i++)
+            window.draw(brickgame_buttons[i]);
+        window.draw(brickgame_screen);
+        viewStates(window);
         getAction();
+
+        if (scene == Overlay) {
+            window.draw(start_text);
+        } else if (scene == Run) {
+            draw(window);
+            logic();
+        } else if (scene == Lose) {
+            window.draw(lose_text);
+        }
 
         window.display();
     }
@@ -71,12 +83,8 @@ void Tetris::initBrickGameScreen() {
 }
 
 void Tetris::draw(sf::RenderWindow &window) {
-    window.draw(brickgame_background);
-    for (int i = 0; i < brickgame_buttons_count + 1; i++)
-        window.draw(brickgame_buttons[i]);
-    window.draw(brickgame_screen);
     drawField(window);
-    drawBrick(window);
+    drawBrick(window, current_brick);
 }
 
 void Tetris::drawField(sf::RenderWindow &window) {
@@ -86,16 +94,85 @@ void Tetris::drawField(sf::RenderWindow &window) {
                 window.draw(field[i][j].pixel);
 }
 
-void Tetris::drawBrick(sf::RenderWindow &window) {
-    for (int i = 0; i < current_brick.size.height; i++)
-        for (int j = 0; j < current_brick.size.width; j++)
-            if (current_brick.matrix[i][j].i)
-                window.draw(current_brick.matrix[i][j].pixel);
+void Tetris::drawBrick(sf::RenderWindow &window, const Brick_t &brick) {
+    for (int i = 0; i < brick.size.height; i++)
+        for (int j = 0; j < brick.size.width; j++)
+            if (brick.matrix[i][j].i)
+                window.draw(brick.matrix[i][j].pixel);
 }
 
 void Tetris::logic() {
     updateField();
     updateBrick();
+}
+
+void Tetris::viewStates(sf::RenderWindow &window) {
+    window.draw(next_text);
+    window.draw(score_text);
+    window.draw(level_text);
+    window.draw(record_text);
+    window.draw(time_text);
+    window.draw(line);
+
+    Point_t pos = next_brick.pos;
+    next_brick.pos = { 12, 3 };
+    updatePixelBrick(next_brick);
+    drawBrick(window, next_brick);
+    next_brick.pos = pos;
+
+    sf::Text score_str;
+    score_str.setFont(font);
+    char score_[11];
+    sprintf(score_, "%d", score);
+    score_str.setString(score_);
+    score_str.setCharacterSize(20);
+    score_str.setPosition(sf::Vector2f(score_text.getPosition().x,
+                                       score_text.getPosition().y + score_text.getCharacterSize()));
+    score_str.setFillColor(score_text.getFillColor());
+    window.draw(score_str);
+
+    sf::Text level_str;
+    level_str.setFont(font);
+    char level_[11];
+    sprintf(level_, "%d", level);
+    level_str.setString(level_);
+    level_str.setCharacterSize(20);
+    level_str.setPosition(sf::Vector2f(level_text.getPosition().x,
+                                       level_text.getPosition().y + level_text.getCharacterSize()));
+    level_str.setFillColor(level_text.getFillColor());
+    window.draw(level_str);
+
+    sf::Text record_str;
+    record_str.setFont(font);
+    char record_[11];
+    sprintf(record_, "%d", record);
+    record_str.setString(record_);
+    record_str.setCharacterSize(20);
+    record_str.setPosition(sf::Vector2f(record_text.getPosition().x,
+                                        record_text.getPosition().y + record_text.getCharacterSize()));
+    record_str.setFillColor(record_text.getFillColor());
+    window.draw(record_str);
+
+    sf::Text time_str;
+    time_str.setFont(font);
+    char time_[11];
+    time_str.setCharacterSize(20);
+    time_str.setPosition(sf::Vector2f(time_text.getPosition().x,
+                                      time_text.getPosition().y + time_text.getCharacterSize()));
+    time_str.setFillColor(time_text.getFillColor());
+    if (scene == Run)
+        sprintf(time_, "%02d:%02d", (int)game_time.getElapsedTime().asSeconds() / 60, (int)game_time.getElapsedTime().asSeconds() % 60);
+    else if (scene == Overlay) {
+        game_time.restart();
+        sprintf(time_, "00:00");
+    } else if (scene == Lose) {
+        if (get_last_time)
+            last_time = game_time.getElapsedTime().asSeconds();
+        get_last_time = false;
+        sprintf(time_, "%02d:%02d", last_time / 60, last_time % 60);
+    }
+    time_str.setString(time_);
+    window.draw(time_str);
 }
 
 void Tetris::getAction() {
@@ -109,12 +186,15 @@ void Tetris::getAction() {
         moveRightBrick();
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
         toDownBrick();
+    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Enter))
+        scene = Run;
 }
 
 void Tetris::initGame() {
     initField();
     initBrick(current_brick);
     initBrick(next_brick);
+    initText();
 }
 
 void Tetris::initField() {
@@ -302,6 +382,15 @@ void Tetris::updateField() {
             }
         }
     }
+
+    bool lose = false;
+    for (int i = 0; i < size_field.width; i++) {
+        if (field[0][i].i) {
+            lose = true;
+            scene = Lose;
+            break;
+        }
+    }
 }
 
 int Tetris::updateBrick() {
@@ -328,7 +417,7 @@ int Tetris::updateBrick() {
         }
     }
 
-    updatePixelBrick();
+    updatePixelBrick(current_brick);
     return is_update;
 }
 
@@ -619,9 +708,57 @@ void Tetris::toDownBrick() {
     }
 }
 
-void Tetris::updatePixelBrick() {
-    for (int i = 0; i < current_brick.size.height; i++)
-        for (int j = 0; j < current_brick.size.width; j++)
-            current_brick.matrix[i][j].pixel.setPosition(sf::Vector2f(brickgame_screen_pos.x + (j + current_brick.pos.x) * size_pixel.width,
-                                                                      brickgame_screen_pos.y + (i + current_brick.pos.y) * size_pixel.height));
+void Tetris::updatePixelBrick(Brick_t &brick) {
+    for (int i = 0; i < brick.size.height; i++)
+        for (int j = 0; j < brick.size.width; j++)
+            brick.matrix[i][j].pixel.setPosition(sf::Vector2f(brickgame_screen_pos.x + (j + brick.pos.x) * size_pixel.width,
+                                                              brickgame_screen_pos.y + (i + brick.pos.y) * size_pixel.height));
+}
+
+void Tetris::initText() {
+    if (font.loadFromFile("..\\..\\..\\..\\fonts\\Silkscreen [Rus by Mr.Enot]\\Silkscreen [RUS by Mr.Enot].ttf")) {
+        next_text.setFont(font);
+        score_text.setFont(font);
+        level_text.setFont(font);
+        record_text.setFont(font);
+        time_text.setFont(font);
+        start_text.setFont(font);
+        lose_text.setFont(font);
+
+        next_text.setString("NEXT");
+        score_text.setString("SCORE");
+        level_text.setString("LEVEL");
+        record_text.setString("RECORD");
+        time_text.setString("TIME");
+        start_text.setString("PRESS ENTER\n\nTO START");
+        lose_text.setString("YOU LOSE");
+
+        next_text.setCharacterSize(20);
+        score_text.setCharacterSize(20);
+        level_text.setCharacterSize(20);
+        record_text.setCharacterSize(20);
+        time_text.setCharacterSize(20);
+        start_text.setCharacterSize(17);
+        lose_text.setCharacterSize(20);
+
+        next_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
+        score_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
+        level_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
+        record_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
+        time_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
+        start_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
+        lose_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
+
+        next_text.setPosition(sf::Vector2f(text_pos.x + 10, text_pos.y + 13));
+        score_text.setPosition(sf::Vector2f(text_pos.x + 10, next_text.getPosition().y + 75));
+        level_text.setPosition(sf::Vector2f(text_pos.x + 10, score_text.getPosition().y + 43));
+        record_text.setPosition(sf::Vector2f(text_pos.x + 10, level_text.getPosition().y + 43));
+        time_text.setPosition(sf::Vector2f(text_pos.x + 10, record_text.getPosition().y + 43));
+        start_text.setPosition(sf::Vector2f(brickgame_screen_pos.x + 3, score_text.getPosition().y + 37));
+        lose_text.setPosition(sf::Vector2f(brickgame_screen_pos.x + 15, score_text.getPosition().y + 43));
+
+        line.setPosition(sf::Vector2f(text_pos.x, text_pos.y));
+        line.setSize(sf::Vector2f(2, brickgame_screen_size.height));
+        line.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
+    }
 }
