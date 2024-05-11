@@ -20,7 +20,7 @@ void Tetris::run() {
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event))
-            if (event.type == sf::Event::Closed)
+            if (event.type == sf::Event::Closed || sf::Keyboard::isKeyPressed(sf::Keyboard::Q))
                 window.close();
 
         window.clear();
@@ -39,6 +39,8 @@ void Tetris::run() {
             logic();
         } else if (scene == Lose) {
             window.draw(lose_text);
+        } else if (scene == Pause) {
+            window.draw(pause_text);
         }
 
         window.display();
@@ -104,6 +106,8 @@ void Tetris::drawBrick(sf::RenderWindow &window, const Brick_t &brick) {
 void Tetris::logic() {
     updateField();
     updateBrick();
+
+    level = score / 600 + 1;
 }
 
 void Tetris::viewStates(sf::RenderWindow &window) {
@@ -160,9 +164,10 @@ void Tetris::viewStates(sf::RenderWindow &window) {
     time_str.setPosition(sf::Vector2f(time_text.getPosition().x,
                                       time_text.getPosition().y + time_text.getCharacterSize()));
     time_str.setFillColor(time_text.getFillColor());
-    if (scene == Run)
-        sprintf(time_, "%02d:%02d", (int)game_time.getElapsedTime().asSeconds() / 60, (int)game_time.getElapsedTime().asSeconds() % 60);
-    else if (scene == Overlay) {
+    if (scene == Run) {
+        sprintf(time_, "%02d:%02d", (int)(game_time.getElapsedTime().asSeconds() - last_pause_time) / 60, (int)(game_time.getElapsedTime().asSeconds() - last_pause_time) % 60);
+        get_last_time = true;
+    } else if (scene == Overlay) {
         game_time.restart();
         sprintf(time_, "00:00");
     } else if (scene == Lose) {
@@ -170,24 +175,42 @@ void Tetris::viewStates(sf::RenderWindow &window) {
             last_time = game_time.getElapsedTime().asSeconds();
         get_last_time = false;
         sprintf(time_, "%02d:%02d", last_time / 60, last_time % 60);
+    } else if (scene == Pause) {
+        if (get_last_time)
+            last_time = game_time.getElapsedTime().asSeconds();
+        get_last_time = false;
+        sprintf(time_, "%02d:%02d", (last_time - last_pause_time) / 60, (last_time - last_pause_time) % 60);
     }
     time_str.setString(time_);
     window.draw(time_str);
 }
 
 void Tetris::getAction() {
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) &&
-        timer_move.getElapsedTime().asMilliseconds() / delay_move > speed / level) {
-        rotateBrick();
-        timer_move.restart();
-    } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
-        moveLeftBrick();
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
-        moveRightBrick();
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-        toDownBrick();
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Enter))
+    if (scene == Run) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) &&
+            timer_move.getElapsedTime().asMilliseconds() / 20 > speed) {
+            rotateBrick();
+            timer_move.restart();
+        } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
+            moveLeftBrick();
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
+            moveRightBrick();
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+            toDownBrick();
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) &&
+                 timer_move.getElapsedTime().asMilliseconds() / 50 > speed) {
+            scene = Pause;
+            pause_time.restart();
+            timer_move.restart();
+        }
+    } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Enter))
         scene = Run;
+    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && scene == Pause &&
+             timer_move.getElapsedTime().asMilliseconds() / 50 > speed) {
+        scene = Run;
+        last_pause_time += pause_time.getElapsedTime().asSeconds();
+        timer_move.restart();
+    }
 }
 
 void Tetris::initGame() {
@@ -724,6 +747,7 @@ void Tetris::initText() {
         time_text.setFont(font);
         start_text.setFont(font);
         lose_text.setFont(font);
+        pause_text.setFont(font);
 
         next_text.setString("NEXT");
         score_text.setString("SCORE");
@@ -732,6 +756,7 @@ void Tetris::initText() {
         time_text.setString("TIME");
         start_text.setString("PRESS ENTER\n\nTO START");
         lose_text.setString("YOU LOSE");
+        pause_text.setString("PAUSE");
 
         next_text.setCharacterSize(20);
         score_text.setCharacterSize(20);
@@ -740,6 +765,7 @@ void Tetris::initText() {
         time_text.setCharacterSize(20);
         start_text.setCharacterSize(17);
         lose_text.setCharacterSize(20);
+        pause_text.setCharacterSize(20);
 
         next_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
         score_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
@@ -748,6 +774,7 @@ void Tetris::initText() {
         time_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
         start_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
         lose_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
+        pause_text.setFillColor(sf::Color(pixel_color.r, pixel_color.g, pixel_color.b));
 
         next_text.setPosition(sf::Vector2f(text_pos.x + 10, text_pos.y + 13));
         score_text.setPosition(sf::Vector2f(text_pos.x + 10, next_text.getPosition().y + 75));
@@ -756,6 +783,7 @@ void Tetris::initText() {
         time_text.setPosition(sf::Vector2f(text_pos.x + 10, record_text.getPosition().y + 43));
         start_text.setPosition(sf::Vector2f(brickgame_screen_pos.x + 3, score_text.getPosition().y + 37));
         lose_text.setPosition(sf::Vector2f(brickgame_screen_pos.x + 15, score_text.getPosition().y + 43));
+        pause_text.setPosition(sf::Vector2f(brickgame_screen_pos.x + 15, score_text.getPosition().y + 43));
 
         line.setPosition(sf::Vector2f(text_pos.x, text_pos.y));
         line.setSize(sf::Vector2f(2, brickgame_screen_size.height));

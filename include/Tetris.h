@@ -60,6 +60,8 @@ private:
     sf::Clock game_time;
     bool get_last_time = true;
     int last_time = 0;
+    sf::Clock pause_time;
+    int last_pause_time = 0;
     int score = 0;
     int record = 0;
     const Size_t size_field = { 10, 20 };
@@ -93,6 +95,7 @@ private:
     sf::Text time_text;
     sf::Text start_text;
     sf::Text lose_text;
+    sf::Text pause_text;
     Point_t text_pos = { brickgame_screen_pos.x + brickgame_screen_size.width / 2, brickgame_screen_pos.y };
 
     sf::RectangleShape line;
